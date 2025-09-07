@@ -14,6 +14,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.io as pio
 import time
 from datetime import datetime, timedelta
 import os
@@ -24,7 +25,7 @@ try:
     from model import (create_lstm_autoencoder, prepare_sequences, load_model_and_threshold,
                       detect_anomalies, save_model_and_threshold)
     from train_and_detect import train_autoencoder, evaluate_anomaly_detection
-    from federated_learning import demonstrate_federated_learning
+    # from federated_learning import demonstrate_federated_learning
 except ImportError as e:
     st.error(f"Import error: {e}. Please ensure all required files are in the same directory.")
 
@@ -36,37 +37,65 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS for modern dark theme
 st.markdown("""
 <style>
+    /* Main app background */
+    .stApp {
+        background-color: #0E1117;
+        color: #FAFAFA;
+    }
+
+    /* Main header */
     .main-header {
         font-size: 2.5rem;
-        color: #1f77b4;
+        color: #00A6FF; /* Bright blue accent */
         text-align: center;
         margin-bottom: 2rem;
     }
+
+    /* Sidebar styling */
+    .css-1d391kg {
+        background-color: #1A1F2D;
+    }
+
+    /* Metric card styling */
     .metric-card {
-        background-color: #f0f2f6;
+        background-color: #1A1F2D;
         padding: 1rem;
         border-radius: 0.5rem;
         text-align: center;
+        border: 1px solid #00A6FF;
     }
+
+    /* Badges */
     .privacy-badge {
-        background-color: #28a745;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.25rem;
-        font-size: 0.8rem;
+        background-color: #00A6FF;
+        color: #FFFFFF;
+        padding: 0.3rem 0.6rem;
+        border-radius: 0.3rem;
+        font-size: 0.9rem;
+        font-weight: bold;
     }
     .alert-badge {
-        background-color: #dc3545;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.25rem;
-        font-size: 0.8rem;
+        background-color: #FF4B4B;
+        color: #FFFFFF;
+        padding: 0.3rem 0.6rem;
+        border-radius: 0.3rem;
+        font-size: 0.9rem;
+        font-weight: bold;
     }
+
+    /* Expander styling */
+    .st-expander {
+        border-color: #00A6FF !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
+
+# Set plotly template to dark
+pio.templates.default = "plotly_dark"
 
 # Initialize session state
 if 'model_trained' not in st.session_state:
@@ -90,71 +119,38 @@ def load_or_generate_data():
         st.session_state.data_generated = True
         return normal_data, anomalous_data
 
-def create_sensor_visualization(data, title, color_theme="viridis"):
-    """Create comprehensive sensor data visualization."""
+def create_sensor_visualization(data, title, sensor):
+    """Create a single sensor data visualization."""
+    fig = go.Figure()
 
-    # Create subplots
-    fig = make_subplots(
-        rows=2, cols=3,
-        subplot_titles=('Motion Sensor', 'Door Events', 'Time in Bed', 
-                       'Step Count', 'Sleep Hours', 'Activity Summary'),
-        specs=[[{"secondary_y": False}, {"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}, {"secondary_y": False}]]
-    )
-
-    # Motion sensor
-    fig.add_trace(
-        go.Scatter(x=data['timestamp'], y=data['motion_sensor'], 
-                  mode='lines', name='Motion', line=dict(color='blue')),
-        row=1, col=1
-    )
-
-    # Door sensor
-    fig.add_trace(
-        go.Bar(x=data['timestamp'], y=data['door_sensor'], 
-               name='Door Events', marker_color='green'),
-        row=1, col=2
-    )
-
-    # Bed sensor
-    fig.add_trace(
-        go.Scatter(x=data['timestamp'], y=data['bed_sensor'], 
-                  mode='lines+markers', name='Bed Time', line=dict(color='purple')),
-        row=1, col=3
-    )
-
-    # Step count (only show non-zero values)
-    step_data = data[data['step_count'] > 0]
-    fig.add_trace(
-        go.Bar(x=step_data['timestamp'], y=step_data['step_count'], 
-               name='Steps', marker_color='orange'),
-        row=2, col=1
-    )
-
-    # Sleep hours (only show non-zero values)
-    sleep_data = data[data['sleep_hours'] > 0]
-    fig.add_trace(
-        go.Bar(x=sleep_data['timestamp'], y=sleep_data['sleep_hours'], 
-               name='Sleep', marker_color='red'),
-        row=2, col=2
-    )
-
-    # Activity summary - combined metric
-    activity_score = (data['motion_sensor'] * 0.3 + 
-                     data['door_sensor'] * 20 + 
-                     data['step_count'] / 100)
-    fig.add_trace(
-        go.Scatter(x=data['timestamp'], y=activity_score, 
-                  mode='lines', name='Activity Score', line=dict(color='black')),
-        row=2, col=3
-    )
+    if sensor == 'Motion Sensor':
+        fig.add_trace(go.Scatter(x=data['timestamp'], y=data['motion_sensor'], mode='lines', name='Motion'))
+        fig.update_layout(yaxis_title='Motion Level')
+    elif sensor == 'Door Events':
+        fig.add_trace(go.Bar(x=data['timestamp'], y=data['door_sensor'], name='Door Events'))
+        fig.update_layout(yaxis_title='Event Count')
+    elif sensor == 'Time in Bed':
+        fig.add_trace(go.Scatter(x=data['timestamp'], y=data['bed_sensor'], mode='lines+markers', name='Bed Time'))
+        fig.update_layout(yaxis_title='Time (hours)')
+    elif sensor == 'Step Count':
+        step_data = data[data['step_count'] > 0]
+        fig.add_trace(go.Bar(x=step_data['timestamp'], y=step_data['step_count'], name='Steps'))
+        fig.update_layout(yaxis_title='Steps')
+    elif sensor == 'Sleep Hours':
+        sleep_data = data[data['sleep_hours'] > 0]
+        fig.add_trace(go.Bar(x=sleep_data['timestamp'], y=sleep_data['sleep_hours'], name='Sleep'))
+        fig.update_layout(yaxis_title='Hours')
+    elif sensor == 'Activity Summary':
+        activity_score = (data['motion_sensor'] * 0.3 + data['door_sensor'] * 20 + data['step_count'] / 100)
+        fig.add_trace(go.Scatter(x=data['timestamp'], y=activity_score, mode='lines', name='Activity Score'))
+        fig.update_layout(yaxis_title='Activity Score')
 
     fig.update_layout(
         title=title,
-        height=600,
-        showlegend=False
+        height=450,
+        showlegend=False,
+        xaxis_title="Timestamp"
     )
-
     return fig
 
 def create_anomaly_timeline(errors, threshold, timestamps):
@@ -201,87 +197,26 @@ def create_anomaly_timeline(errors, threshold, timestamps):
 
     return fig
 
-def home_page():
-    """Home page with project overview."""
+def dashboard_page():
+    """Main dashboard with data visualization and anomaly detection."""
 
     st.markdown('<h1 class="main-header">🧠 NeuroFlow</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #666;">Privacy-First Mental Health Monitoring through Ambient Intelligence</p>', unsafe_allow_html=True)
 
-    # Key features
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
+    with st.expander("About NeuroFlow"):
         st.markdown("""
-        ### 🔒 Privacy by Design
-        - Data never leaves your device
-        - Federated learning architecture
-        - HIPAA/GDPR compliant
-        - No central health database
+        NeuroFlow represents a breakthrough in mental health monitoring technology. By leveraging ambient intelligence
+        and privacy-preserving machine learning, we enable continuous behavioral monitoring that can detect early
+        signs of mental health changes without compromising user privacy.
+
+        **How it works:**
+        1. **Ambient Data Collection**: Smart home sensors passively collect behavioral patterns
+        2. **Local AI Processing**: LSTM Autoencoder runs on your device to learn normal patterns
+        3. **Federated Learning**: Multiple users collaborate to improve the model without sharing data
+        4. **Anomaly Detection**: Unusual behavioral patterns trigger early intervention alerts
+        5. **Privacy Preservation**: All sensitive data remains on your local device
         """)
 
-    with col2:
-        st.markdown("""
-        ### 🧠 Intelligent Detection
-        - LSTM Autoencoder AI model
-        - Personalized anomaly detection
-        - Behavioral pattern analysis
-        - Early intervention alerts
-        """)
-
-    with col3:
-        st.markdown("""
-        ### 📱 Ambient Sensing
-        - Smart home integration
-        - Passive monitoring
-        - Multimodal sensor fusion
-        - Non-intrusive approach
-        """)
-
-    # Status indicators
-    st.markdown("### 📊 System Status")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        data_status = "✅ Ready" if st.session_state.data_generated or os.path.exists('normal_week.csv') else "⏳ Pending"
-        st.metric("Data Generation", data_status)
-
-    with col2:
-        model_status = "✅ Trained" if st.session_state.model_trained or os.path.exists('neuroflow_autoencoder.h5') else "⏳ Pending"
-        st.metric("Model Training", model_status)
-
-    with col3:
-        fed_status = "✅ Complete" if st.session_state.federated_complete else "⏳ Pending"
-        st.metric("Federated Learning", fed_status)
-
-    with col4:
-        privacy_status = "🔒 Enabled"
-        st.metric("Privacy Mode", privacy_status)
-
-    # Project description
-    st.markdown("""
-    ### 🎯 Project Overview
-
-    NeuroFlow represents a breakthrough in mental health monitoring technology. By leveraging ambient intelligence 
-    and privacy-preserving machine learning, we enable continuous behavioral monitoring that can detect early 
-    signs of mental health changes without compromising user privacy.
-
-    **How it works:**
-    1. **Ambient Data Collection**: Smart home sensors passively collect behavioral patterns
-    2. **Local AI Processing**: LSTM Autoencoder runs on your device to learn normal patterns
-    3. **Federated Learning**: Multiple users collaborate to improve the model without sharing data
-    4. **Anomaly Detection**: Unusual behavioral patterns trigger early intervention alerts
-    5. **Privacy Preservation**: All sensitive data remains on your local device
-
-    **Key Innovation**: Traditional mental health monitoring requires active engagement and data sharing. 
-    NeuroFlow provides passive, privacy-preserving monitoring that respects user autonomy while enabling 
-    proactive mental healthcare.
-    """)
-
-def dashboard_page():
-    """Main dashboard with data visualization and anomaly detection."""
-
-    st.title("📊 NeuroFlow Dashboard")
     st.markdown('<span class="privacy-badge">🔒 Privacy Mode: ON</span>', unsafe_allow_html=True)
 
     # Load data
@@ -300,40 +235,38 @@ def dashboard_page():
         ["Normal Behavior", "Anomalous Behavior", "Both"]
     )
 
+    # Sensor selection
+    sensor_options = ['Motion Sensor', 'Door Events', 'Time in Bed', 'Step Count', 'Sleep Hours', 'Activity Summary']
+    selected_sensor = st.sidebar.selectbox("Select Sensor to Visualize", sensor_options)
+
     # Visualization controls
     show_raw_data = st.sidebar.checkbox("Show Raw Data Table", False)
     threshold_adjust = st.sidebar.slider("Anomaly Threshold Multiplier", 0.5, 2.0, 1.0, 0.1)
 
     # Main dashboard layout
-    if data_type == "Normal Behavior":
-        st.subheader("📈 Normal Behavioral Patterns")
-        fig = create_sensor_visualization(normal_data, "Normal Behavior - 7 Day Pattern")
-        st.plotly_chart(fig, use_container_width=True)
+    st.subheader(f"📊 Behavioral Patterns: {selected_sensor}")
 
+    if data_type == "Normal Behavior":
+        fig = create_sensor_visualization(normal_data, f"Normal Behavior: {selected_sensor}", selected_sensor)
+        st.plotly_chart(fig, use_container_width=True)
         if show_raw_data:
-            st.subheader("📋 Raw Sensor Data")
+            st.subheader("📋 Raw Sensor Data (Normal)")
             st.dataframe(normal_data)
 
     elif data_type == "Anomalous Behavior":
-        st.subheader("⚠️ Anomalous Behavioral Patterns")
-        fig = create_sensor_visualization(anomalous_data, "Anomalous Behavior - Depression Indicators")
+        fig = create_sensor_visualization(anomalous_data, f"Anomalous Behavior: {selected_sensor}", selected_sensor)
         st.plotly_chart(fig, use_container_width=True)
-
         if show_raw_data:
-            st.subheader("📋 Raw Sensor Data")
+            st.subheader("📋 Raw Sensor Data (Anomalous)")
             st.dataframe(anomalous_data)
 
     else:  # Both
         col1, col2 = st.columns(2)
-
         with col1:
-            st.subheader("📈 Normal Patterns")
-            fig1 = create_sensor_visualization(normal_data, "Normal Behavior")
+            fig1 = create_sensor_visualization(normal_data, f"Normal: {selected_sensor}", selected_sensor)
             st.plotly_chart(fig1, use_container_width=True)
-
         with col2:
-            st.subheader("⚠️ Anomalous Patterns")  
-            fig2 = create_sensor_visualization(anomalous_data, "Anomalous Behavior")
+            fig2 = create_sensor_visualization(anomalous_data, f"Anomalous: {selected_sensor}", selected_sensor)
             st.plotly_chart(fig2, use_container_width=True)
 
     # Anomaly detection section
@@ -525,132 +458,39 @@ def model_training_page():
     else:
         st.warning("⏳ No trained model found. Train a model to enable anomaly detection.")
 
-def federated_learning_page():
-    """Federated learning demonstration."""
-
-    st.title("🌐 Federated Learning")
-    st.markdown("Privacy-preserving collaborative AI training")
-
-    # Explanation
-    st.subheader("🔒 Privacy-First Approach")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("""
-        **Traditional Centralized Learning:**
-        - ❌ All data sent to central server
-        - ❌ Privacy risks and data breaches
-        - ❌ Regulatory compliance challenges
-        - ❌ User trust issues
-        """)
-
-    with col2:
-        st.markdown("""
-        **NeuroFlow Federated Learning:**
-        - ✅ Data stays on user devices
-        - ✅ Only model updates shared
-        - ✅ Collaborative improvement
-        - ✅ Privacy by design
-        """)
-
-    # Federated learning simulation
-    st.subheader("🚀 Federated Training Simulation")
-
-    # Parameters
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        num_clients = st.selectbox("Number of Clients", [3, 5, 10], index=0)
-
-    with col2:
-        num_rounds = st.selectbox("Federated Rounds", [1, 3, 5], index=1)
-
-    with col3:
-        local_epochs = st.selectbox("Local Epochs", [5, 10, 15], index=1)
-
-    if st.button("🌐 Start Federated Learning", type="primary"):
-
-        with st.spinner("Running federated learning simulation..."):
-
-            try:
-                # Import and run federated learning
-                from federated_learning import FederatedLearningSimulator
-
-                # Create simulator
-                fed_sim = FederatedLearningSimulator(
-                    num_clients=num_clients,
-                    timesteps=24,
-                    features=5,
-                    latent_dim=32
-                )
-
-                # Run simulation
-                results = fed_sim.run_federated_training(
-                    num_rounds=num_rounds,
-                    local_epochs=local_epochs
-                )
-
-                # Update session state
-                st.session_state.federated_complete = True
-
-                st.success("✅ Federated learning simulation completed!")
-
-                # Display results
-                st.subheader("📊 Federated Learning Results")
-
-                # Create results visualization
-                round_losses = [r['federated_results']['average_loss'] for r in results]
-
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=list(range(1, len(round_losses) + 1)),
-                    y=round_losses,
-                    mode='lines+markers',
-                    name='Average Loss',
-                    line=dict(color='blue', width=3),
-                    marker=dict(size=10)
-                ))
-
-                fig.update_layout(
-                    title="Federated Learning Progress",
-                    xaxis_title="Federated Round",
-                    yaxis_title="Average Loss",
-                    height=400
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-
-                # Privacy metrics
-                st.subheader("🔒 Privacy Analysis")
-
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-                    st.metric("Clients Participated", num_clients)
-
-                with col2:
-                    total_samples = sum(r['federated_results']['total_samples'] for r in results)
-                    st.metric("Total Samples (Local)", f"{total_samples:,}")
-
-                with col3:
-                    st.metric("Data Shared", "0 bytes")
-
-                st.success("🛡️ **Privacy Preserved**: All sensitive health data remained on local devices throughout the entire training process.")
-
-            except Exception as e:
-                st.error(f"Federated learning simulation failed: {e}")
-
-    # Privacy comparison
-    st.subheader("📊 Privacy Comparison")
-
-    comparison_data = {
-        'Metric': ['Data Location', 'Network Traffic', 'Model Updates', 'Privacy Risk', 'Compliance'],
-        'Centralized': ['Server', 'High (Raw Data)', 'Server Only', 'High', 'Complex'],
-        'Federated': ['Local Devices', 'Low (Model Weights)', 'Collaborative', 'Minimal', 'Built-in']
-    }
-
-    st.table(pd.DataFrame(comparison_data))
+# def federated_learning_page():
+#     """Federated learning demonstration."""
+#
+#     st.title("🌐 Federated Learning")
+#     st.markdown("Privacy-preserving collaborative AI training")
+#
+#     # Explanation
+#     st.subheader("🔒 Privacy-First Approach")
+#
+#     col1, col2 = st.columns(2)
+#
+#     with col1:
+#         st.markdown("""
+#         **Traditional Centralized Learning:**
+#         - ❌ All data sent to central server
+#         - ❌ Privacy risks and data breaches
+#         - ❌ Regulatory compliance challenges
+#         - ❌ User trust issues
+#         """)
+#
+#     with col2:
+#         st.markdown("""
+#         **NeuroFlow Federated Learning:**
+#         - ✅ Data stays on user devices
+#         - ✅ Only model updates shared
+#         - ✅ Collaborative improvement
+#         - ✅ Privacy by design
+#         """)
+#
+#     # Federated learning simulation
+#     st.subheader("🚀 Federated Training Simulation")
+#
+#     st.info("Federated learning is temporarily disabled due to dependency issues.")
 
 def privacy_settings_page():
     """Privacy controls and settings."""
@@ -840,19 +680,16 @@ def main():
 
     # Sidebar navigation
     st.sidebar.title("🧠 NeuroFlow")
-    st.sidebar.markdown("Privacy-First Mental Health Monitoring")
+    st.sidebar.markdown("*Privacy-First Mental Health Monitoring*")
 
     # Navigation
     page = st.sidebar.selectbox(
-        "Navigate",
-        ["🏠 Home", "📊 Dashboard", "🤖 Model Training", "🌐 Federated Learning", "🔒 Privacy Settings"]
+        "Navigation",
+        ["📊 Dashboard", "🤖 Model Training", "🔒 Privacy Settings"]
     )
 
     # Page routing
-    if page == "🏠 Home":
-        home_page()
-
-    elif page == "📊 Dashboard":
+    if page == "📊 Dashboard":
         dashboard_page()
 
         # Add real-time monitoring section
@@ -862,13 +699,18 @@ def main():
     elif page == "🤖 Model Training":
         model_training_page()
 
-    elif page == "🌐 Federated Learning":
-        federated_learning_page()
-
     elif page == "🔒 Privacy Settings":
         privacy_settings_page()
 
     # Footer
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**📊 System Status**")
+    data_status = "✅ Ready" if st.session_state.data_generated or os.path.exists('normal_week.csv') else "⏳ Pending"
+    st.sidebar.metric("Data Generation", data_status)
+    model_status = "✅ Trained" if st.session_state.model_trained or os.path.exists('neuroflow_autoencoder.h5') else "⏳ Pending"
+    st.sidebar.metric("Model Training", model_status)
+    fed_status = "✅ Complete" if st.session_state.federated_complete else "⏳ Pending"
+    st.sidebar.metric("Federated Learning", fed_status)
     st.sidebar.markdown("---")
     st.sidebar.markdown("**🛡️ Privacy Status**")
     st.sidebar.success("🔒 All data stays local")
