@@ -2,8 +2,8 @@
 # Python Dependencies
 
 # Core ML and Data Science
-tensorflow>=2.10.0
-tensorflow-federated>=0.53.0
+tensorflow
+tensorflow-federated
 scikit-learn>=1.1.0
 pandas>=1.5.0
 numpy>=1.21.0
