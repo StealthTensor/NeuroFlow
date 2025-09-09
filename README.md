@@ -1,6 +1,4 @@
-# 🧠 NeuroFlow: Your Friendly Neighborhood Behavior Monitor
-
-Welcome to NeuroFlow! This project was born during a 2025 Mental Health Hackathon where we were fueled by coffee, ambition, and a mission to tackle a tough problem: *How can we monitor for signs of mental health decline without sacrificing personal privacy?*
+#  NeuroFlow: Your Friendly Neighborhood Behavior Monitor
 
 ## The Problem
 
