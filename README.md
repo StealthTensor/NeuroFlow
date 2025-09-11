@@ -56,4 +56,4 @@ Here's a quick look at the most important files:
 
 ---
 
-*Disclaimer: This is a hackathon project. If it gains sentience and starts judging your life choices, that was not part of the original plan. Please unplug it immediately.*
+*Disclaimer: This is a hackathon project. If it gains sentience and starts judging your life choices, that was not part of the original plan. Please unplug it immediately.* 
